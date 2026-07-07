@@ -1,0 +1,57 @@
+# Festival CRM
+
+A sales CRM focused on U.S. music festivals. FastAPI + SQLite backend, single-page
+minimalist frontend.
+
+## What it does
+
+- **Festivals tab** — sortable database of U.S. music festivals: name, website,
+  dates, ticket prices, estimated revenue, contacts, ticketing platform, platform
+  tenure, and an inline **In Salesforce?** yes/no dropdown. Filter chips for
+  Qualified ($2M+), Needs review, and Salesforce status. Click any row to edit
+  everything (including a manual revenue override, which always wins over the
+  estimate). Ships pre-seeded with ~38 major U.S. festivals.
+- **Prospecting tab** — accounts you're actively working. Add manually or hit
+  **+ Prospect** on any festival row. Inline-editable stage (Researching →
+  Outreach → Meeting → Negotiating → Closed), priority, next step, and notes.
+- **Daily scraper** — runs automatically once a day (and on demand via the
+  status bar). Discovers new festivals from Music Festival Wizard's US guide and
+  Wikipedia's list of U.S. music festivals, dedupes against the database,
+  estimates revenue from attendance where available, and:
+  - adds revenue-qualified finds (est. ≥ $2M) to the main list flagged **review**
+  - queues the rest in the **Needs review** filter (capped per run)
+
+## Data honesty
+
+Seeded revenue/attendance figures are estimates assembled from public reporting —
+good enough for territory planning, verify before quoting. Ticketing platform
+entries marked "verify" in notes are informed guesses. Scraped revenue estimates
+use `attendance × ~$200 avg pass` when prices are unknown and are always flagged
+for review.
+
+## Deploy on Railway
+
+1. New Project → **Deploy from GitHub repo** → pick this repo.
+2. Add a **Volume** to the service, mounted at `/data` (SQLite must live on a
+   volume or your data is wiped on every deploy).
+3. Set variables:
+   - `DB_PATH=/data/festival_crm.db`
+   - `APP_PASSWORD=<pick a password>` — required for a work database on a public
+     URL. Without it the site is open to anyone who finds the link.
+   - optional `SCRAPE_HOUR_UTC` (default `13` ≈ 6am PT)
+4. Generate a domain under Settings → Networking. That URL works from any
+   machine, including your work laptop — just enter the password.
+
+## Run locally
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload
+# open http://localhost:8000
+```
+
+## API
+
+`/api/festivals` (GET/POST), `/api/festivals/{id}` (PATCH/DELETE),
+`/api/prospects` (same shape), `/api/scrape/run` (POST),
+`/api/scrape/logs` (GET), `/api/login` (POST), `/api/auth` (GET).

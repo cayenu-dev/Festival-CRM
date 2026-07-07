@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Festival CRM</title>
+<style>
+  :root {
+    --bg: #fafafa; --card: #ffffff; --border: #e7e7e9; --border-strong: #d4d4d8;
+    --text: #18181b; --muted: #71717a; --faint: #a1a1aa;
+    --accent: #18181b; --green: #16a34a; --amber: #d97706; --red: #dc2626;
+    --hover: #f4f4f5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  /* ── Header ─────────────────────────────── */
+  header {
+    display: flex; align-items: center; gap: 24px;
+    padding: 14px 28px; background: var(--card);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 40;
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.2px; white-space: nowrap; }
+  .brand span { color: var(--faint); font-weight: 400; }
+  nav { display: flex; gap: 4px; }
+  nav button {
+    border: none; background: none; padding: 7px 14px; border-radius: 7px;
+    font-size: 13.5px; color: var(--muted); cursor: pointer; font-weight: 500;
+  }
+  nav button.active { background: var(--text); color: #fff; }
+  nav button:not(.active):hover { background: var(--hover); color: var(--text); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .search {
+    width: 240px; padding: 7px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; background: var(--bg); outline: none;
+  }
+  .search:focus { border-color: var(--border-strong); background: #fff; }
+  .btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); font-size: 13px; font-weight: 500; cursor: pointer;
+    color: var(--text); white-space: nowrap;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--text); border-color: var(--text); color: #fff; }
+  .btn.primary:hover { opacity: .85; }
+  .btn.danger { color: var(--red); border-color: #fecaca; }
+  .btn.sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+
+  /* ── Toolbar / chips ────────────────────── */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; padding: 14px 28px 0;
+    flex-wrap: wrap;
+  }
+  .chip {
+    padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border);
+    background: var(--card); font-size: 12.5px; color: var(--muted);
+    cursor: pointer; font-weight: 500;
+  }
+  .chip.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .count { margin-left: auto; font-size: 12.5px; color: var(--faint); }
+
+  /* ── Table ──────────────────────────────── */
+  .table-wrap {
+    margin: 14px 28px 60px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; overflow: auto;
+    max-height: calc(100vh - 210px);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1080px; }
+  thead th {
+    position: sticky; top: 0; background: var(--card); z-index: 10;
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); font-weight: 600;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th.nosort { cursor: default; }
+  thead th .arrow { color: var(--faint); font-size: 10px; margin-left: 3px; }
+  tbody td {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    vertical-align: middle; white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--hover); }
+  .fname { font-weight: 600; }
+  .fsub { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
+  .link { color: #2563eb; text-decoration: none; font-size: 12.5px; }
+  .link:hover { text-decoration: underline; }
+  .rev { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .rev-tag { font-size: 10px; color: var(--faint); font-weight: 400; margin-left: 4px; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: 99px; margin-left: 6px; vertical-align: 1px;
+  }
+  .badge.review { background: #fef3c7; color: #92400e; }
+  .badge.scraped { background: #e0e7ff; color: #3730a3; }
+  select.inline {
+    padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); font-size: 12.5px; cursor: pointer; color: var(--text);
+  }
+  select.inline.sf-yes { border-color: #bbf7d0; background: #f0fdf4; color: var(--green); font-weight: 600; }
+  input.cell {
+    border: 1px solid transparent; background: none; font-size: 12.5px;
+    padding: 4px 6px; border-radius: 6px; width: 100%; min-width: 110px;
+    color: var(--text); font-family: inherit;
+  }
+  input.cell:hover { border-color: var(--border); }
+  input.cell:focus { border-color: var(--border-strong); background: #fff; outline: none; }
+  .empty { padding: 48px; text-align: center; color: var(--faint); font-size: 13.5px; }
+
+  /* ── Status bar ─────────────────────────── */
+  .statusbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--card); border-top: 1px solid var(--border);
+    padding: 8px 28px; font-size: 12px; color: var(--muted);
+    display: flex; align-items: center; gap: 14px; z-index: 30;
+  }
+  .statusbar button { font-size: 12px; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; margin-right: 5px; }
+  .dot.ok { background: var(--green); } .dot.error { background: var(--red); }
+  .dot.running { background: var(--amber); }
+
+  /* ── Drawer ─────────────────────────────── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(24,24,27,0.25); z-index: 50;
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: -520px; width: 500px; max-width: 94vw;
+    height: 100vh; background: var(--card); z-index: 60;
+    border-left: 1px solid var(--border); transition: right .18s ease;
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { right: 0; }
+  .drawer-head {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-head h2 { font-size: 15px; font-weight: 700; }
+  .drawer-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+  .drawer-foot {
+    padding: 14px 24px; border-top: 1px solid var(--border);
+    display: flex; gap: 10px; justify-content: flex-end; align-items: center;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--text);
+    background: #fff; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--border-strong); }
+  .field textarea { resize: vertical; min-height: 64px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .hint { font-size: 11.5px; color: var(--faint); margin-top: 4px; }
+  .checkline { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 14px; }
+  .checkline input { width: auto; }
+  .xbtn { border: none; background: none; font-size: 18px; color: var(--faint); cursor: pointer; }
+  .xbtn:hover { color: var(--text); }
+
+  /* ── Login ──────────────────────────────── */
+  .login-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 100;
+    display: none; align-items: center; justify-content: center;
+  }
+  .login-screen.open { display: flex; }
+  .login-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 36px; width: 340px; text-align: center;
+  }
+  .login-card h1 { font-size: 17px; margin-bottom: 6px; }
+  .login-card p { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .login-card input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 14px; margin-bottom: 12px; outline: none;
+  }
+  .login-err { color: var(--red); font-size: 12.5px; margin-bottom: 10px; display: none; }
+
+  /* ── Toast ──────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%) translateY(8px);
+    background: var(--text); color: #fff; padding: 9px 18px; border-radius: 9px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: all .2s; z-index: 90;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .prospect-btn { border: 1px solid var(--border); background: var(--card);
+    border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; color: var(--muted); }
+  .prospect-btn:hover { border-color: var(--border-strong); color: var(--text); }
+  .prospect-btn.added { color: var(--green); border-color: #bbf7d0; background: #f0fdf4; cursor: default; }
+  .stage-select { font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Festival CRM</h1>
+    <p>Enter your password to continue</p>
+    <div class="login-err" id="loginErr">Wrong password — try again.</div>
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+    <button class="btn primary" style="width:100%" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
+<header>
+  <div class="brand">Festival CRM <span>· U.S.</span></div>
+  <nav>
+    <button id="tab-festivals" class="active" onclick="setTab('festivals')">Festivals</button>
+    <button id="tab-prospects" onclick="setTab('prospects')">Prospecting</button>
+  </nav>
+  <div class="header-right">
+    <input class="search" id="search" placeholder="Search…" oninput="render()">
+    <button class="btn primary" id="addBtn" onclick="openAdd()">+ Add festival</button>
+  </div>
+</header>
+
+<div class="toolbar" id="chipbar"></div>
+<div class="table-wrap" id="tableWrap"></div>
+
+<div class="statusbar" id="statusbar"></div>
+
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">Edit</h2>
+    <button class="xbtn" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot" id="drawerFoot"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── State ─────────────────────────────────── */
+let festivals = [], prospects = [], scrapeLogs = [];
+let tab = 'festivals';
+let filter = 'qualified';
+let sort = { key: 'effective_revenue', dir: -1 };
+let psort = { key: 'created_at', dir: -1 };
+
+const STAGES = [
+  ['researching', 'Researching'], ['outreach', 'Outreach'], ['meeting', 'Meeting'],
+  ['negotiating', 'Negotiating'], ['closed_won', 'Closed – Won'], ['closed_lost', 'Closed – Lost'],
+];
+const PRIORITIES = [['high','High'],['medium','Medium'],['low','Low']];
+
+/* ── Helpers ───────────────────────────────── */
+const $ = id => document.getElementById(id);
+const esc = s => (s == null ? '' : String(s))
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function money(v) {
+  if (v == null) return null;
+  if (v >= 1e6) return '$' + (v/1e6 >= 10 ? Math.round(v/1e6) : (v/1e6).toFixed(1)) + 'M';
+  if (v >= 1e3) return '$' + Math.round(v/1e3) + 'K';
+  return '$' + Math.round(v);
+}
+function price(f) {
+  const a = f.ticket_price_min, b = f.ticket_price_max;
+  if (a == null && b == null) return null;
+  if (a != null && b != null) return `$${Math.round(a)}–$${Math.round(b)}`;
+  return '$' + Math.round(a != null ? a : b);
+}
+function domain(url) {
+  try { return new URL(url).hostname.replace(/^www\./,''); } catch { return url; }
+}
+function tenure(f) {
+  if (!f.platform_since_year) return null;
+  const yrs = new Date().getFullYear() - f.platform_since_year;
+  return `since ${f.platform_since_year} · ${yrs} yr${yrs === 1 ? '' : 's'}`;
+}
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', ...opts,
+  });
+  if (r.status === 401) { $('loginScreen').classList.add('open'); throw new Error('auth'); }
+  if (!r.ok) {
+    let d = 'Request failed'; try { d = (await r.json()).detail || d; } catch {}
+    toast(d); throw new Error(d);
+  }
+  return r.json();
+}
+
+async function doLogin() {
+  const pw = $('loginPassword').value;
+  try {
+    await api('/api/login', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    $('loginScreen').classList.remove('open'); $('loginErr').style.display = 'none';
+    loadAll();
+  } catch { $('loginErr').style.display = 'block'; }
+}
+$('loginPassword') && $('loginPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+/* ── Data load ─────────────────────────────── */
+async function loadAll() {
+  [festivals, prospects, scrapeLogs] = await Promise.all([
+    api('/api/festivals'), api('/api/prospects'), api('/api/scrape/logs'),
+  ]);
+  render(); renderStatusbar();
+}
+
+/* ── Tabs / chips ──────────────────────────── */
+function setTab(t) {
+  tab = t;
+  $('tab-festivals').classList.toggle('active', t === 'festivals');
+  $('tab-prospects').classList.toggle('active', t === 'prospects');
+  $('addBtn').textContent = t === 'festivals' ? '+ Add festival' : '+ Add prospect';
+  $('search').value = '';
+  render();
+}
+
+const CHIPS = [
+  ['qualified', 'Qualified ($2M+)'], ['all', 'All'], ['review', 'Needs review'],
+  ['sf_yes', 'In Salesforce'], ['sf_no', 'Not in Salesforce'],
+];
+function renderChips(visibleCount, totalLabel) {
+  const bar = $('chipbar');
+  if (tab !== 'festivals') {
+    bar.innerHTML = `<span class="count">${totalLabel}</span>`;
+    return;
+  }
+  bar.innerHTML = CHIPS.map(([k, label]) =>
+    `<button class="chip ${filter === k ? 'active' : ''}" onclick="filter='${k}';render()">${label}</button>`
+  ).join('') + `<span class="count">${totalLabel}</span>`;
+}
+
+/* ── Festivals table ───────────────────────── */
+const COLS = [
+  ['name', 'Festival'], ['website', 'Website'], ['dates', 'Dates'],
+  ['price', 'Ticket Prices'], ['effective_revenue', 'Est. Revenue'],
+  ['ticketing_platform', 'Ticketing Platform'], ['platform_since_year', 'Platform Tenure'],
+  ['contacts', 'Contacts'], ['in_salesforce', 'In Salesforce?'], ['_actions', ''],
+];
+
+function sortVal(f, key) {
+  switch (key) {
+    case 'name': return (f.name || '').toLowerCase();
+    case 'website': return domain(f.website || '') || null;
+    case 'dates': return f.start_month || null;
+    case 'price': return f.ticket_price_min != null ? f.ticket_price_min : f.ticket_price_max;
+    case 'effective_revenue': return f.effective_revenue;
+    case 'ticketing_platform': return (f.ticketing_platform || '').toLowerCase() || null;
+    case 'platform_since_year': return f.platform_since_year;
+    case 'contacts': return (f.contacts || '').toLowerCase() || null;
+    case 'in_salesforce': return f.in_salesforce ? 1 : 0;
+    default: return null;
+  }
+}
+
+function filteredFestivals() {
+  const q = $('search').value.trim().toLowerCase();
+  let rows = festivals.filter(f => {
+    if (filter === 'qualified' && !f.qualified) return false;
+    if (filter === 'review' && !f.needs_review) return false;
+    if (filter === 'sf_yes' && !f.in_salesforce) return false;
+    if (filter === 'sf_no' && f.in_salesforce) return false;
+    if (q) {
+      const hay = [f.name, f.city, f.state, f.ticketing_platform, f.contacts, f.notes]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  rows.sort((a, b) => {
+    const va = sortVal(a, sort.key), vb = sortVal(b, sort.key);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;               // nulls always last
+    if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * sort.dir;
+  });
+  return rows;
+}
+
+function setSort(key) {
+  if (key === '_actions') return;
+  if (sort.key === key) sort.dir *= -1;
+  else sort = { key, dir: key === 'name' || key === 'website' || key === 'ticketing_platform' ? 1 : -1 };
+  render();
+}
+
+function renderFestivals() {
+  const rows = filteredFestivals();
+  renderChips(rows.length, `${rows.length} of ${festivals.length} festivals`);
+  const prospectIds = new Set(prospects.map(p => p.festival_id).filter(Boolean));
+
+  const thead = COLS.map(([k, label]) => {
+    if (k === '_actions') return `<th class="nosort"></th>`;
+    const arrow = sort.key === k ? `<span class="arrow">${sort.dir === 1 ? '▲' : '▼'}</span>` : '';
+    return `<th onclick="setSort('${k}')">${label}${arrow}</th>`;
+  }).join('');
+
+  const body = rows.map(f => {
+    const loc = [f.city, f.state].filter(Boolean).join(', ');
+    const badges =
+      (f.needs_review ? `<span class="badge review">review</span>` : '') +
+      (f.source === 'scraped' ? `<span class="badge scraped">scraped</span>` : '');
+    const rev = f.effective_revenue != null
+      ? `<span class="rev">${money(f.effective_revenue)}</span><span class="rev-tag">${f.revenue_override != null ? 'manual' : 'est.'}</span>`
+      : `<span class="faint">—</span>`;
+    const contacts = f.contacts
+      ? `<span class="muted" title="${esc(f.contacts)}">${esc(f.contacts.length > 34 ? f.contacts.slice(0, 34) + '…' : f.contacts)}</span>`
+      : `<span class="faint">—</span>`;
+    const inP = prospectIds.has(f.id);
+    return `<tr onclick="openEdit(${f.id})">
+      <td><div class="fname">${esc(f.name)}${badges}</div><div class="fsub">${esc(loc) || '&nbsp;'}</div></td>
+      <td>${f.website ? `<a class="link" href="${esc(f.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(domain(f.website))}</a>` : '<span class="faint">—</span>'}</td>
+      <td class="muted">${esc(f.dates) || '<span class="faint">—</span>'}</td>
+      <td class="muted">${price(f) || '<span class="faint">—</span>'}</td>
+      <td>${rev}</td>
+      <td>${esc(f.ticketing_platform) || '<span class="faint">—</span>'}</td>
+      <td class="muted">${tenure(f) || '<span class="faint">—</span>'}</td>
+      <td>${contacts}</td>
+      <td onclick="event.stopPropagation()">
+        <select class="inline ${f.in_salesforce ? 'sf-yes' : ''}" onchange="toggleSF(${f.id}, this.value)">
+          <option value="no" ${!f.in_salesforce ? 'selected' : ''}>No</option>
+          <option value="yes" ${f.in_salesforce ? 'selected' : ''}>Yes</option>
+        </select>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <button class="prospect-btn ${inP ? 'added' : ''}" ${inP ? 'disabled' : ''}
+          onclick="addProspectFromFestival(${f.id}, this)">${inP ? '✓ Prospect' : '+ Prospect'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  $('tableWrap').innerHTML = rows.length
+    ? `<table><thead><tr>${thead}</tr></thead><tbody>${body}</tbody></table>`
+    : `<div class="empty">No festivals match. Try another filter, or add one.</div>`;
+}
+
+async function toggleSF(id, val) {
+  const f = festivals.find(x => x.id === id);
+  const updated = await api(`/api/festivals/${id}`, {
+    method: 'PATCH', body: JSON.stringify({ in_salesforce: val === 'yes' }) });
+  Object.assign(f, updated); render();
+}
+
+async function addProspectFromFestival(fid, btn) {
+  btn.disabled = true;
+  const p = await api('/api/prospects', { method: 'POST', body: JSON.stringify({ festival_id: fid }) });
+  if (!prospects.find(x => x.id === p.id)) prospects.push(p);
+  toast(`${p.name} added to prospecting`); render();
+}
+
+/* ── Prospects table ───────────────────────── */
+const PCOLS = [
+  ['name', 'Account'], ['stage', 'Stage'], ['priority', 'Priority'],
+  ['next_step', 'Next Step'], ['next_step_date', 'By'], ['notes', 'Notes'],
+  ['created_at', 'Added'], ['_x', ''],
+];
+
+function renderProspects() {
+  const q = $('search').value.trim().toLowerCase();
+  let rows = prospects.filter(p => !q ||
+    [p.name, p.stage, p.next_step, p.notes, p.contacts].join(' ').toLowerCase().includes(q));
+  rows.sort((a, b) => {
+    let va = a[psort.key], vb = b[psort.key];
+    if (psort.key === 'priority') {
+      const ord = { high: 0, medium: 1, low: 2 }; va = ord[va]; vb = ord[vb];
+    }
+    if (va == null) return 1; if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * psort.dir;
+  });
+  renderChips(rows.length, `${rows.length} prospect${rows.length === 1 ? '' : 's'}`);
+
+  const thead = PCOLS.map(([k, label]) => {
+    if (k === '_x') return '<th class="nosort"></th>';
+    const arrow = psort.key === k ? `<span class="arrow">${psort.dir === 1 ? '▲' : '▼'}</span>` : '';
+    return `<th onclick="setPSort('${k}')">${label}${arrow}</th>`;
+  }).join('');
+
+  const body = rows.map(p => {
+    const stageSel = `<select class="inline stage-select" onchange="patchProspect(${p.id}, {stage: this.value})" onclick="event.stopPropagation()">
+      ${STAGES.map(([v, l]) => `<option value="${v}" ${p.stage === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    const priSel = `<select class="inline" onchange="patchProspect(${p.id}, {priority: this.value})" onclick="event.stopPropagation()">
+      ${PRIORITIES.map(([v, l]) => `<option value="${v}" ${p.priority === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    return `<tr onclick="openProspectEdit(${p.id})">
+      <td><div class="fname">${esc(p.name)}</div>
+        ${p.website ? `<a class="link" href="${esc(p.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(domain(p.website))}</a>` : ''}</td>
+      <td onclick="event.stopPropagation()">${stageSel}</td>
+      <td onclick="event.stopPropagation()">${priSel}</td>
+      <td onclick="event.stopPropagation()"><input class="cell" value="${esc(p.next_step)}" placeholder="Add next step…"
+        onchange="patchProspect(${p.id}, {next_step: this.value})"></td>
+      <td onclick="event.stopPropagation()"><input class="cell" type="date" style="min-width:130px" value="${esc(p.next_step_date)}"
+        onchange="patchProspect(${p.id}, {next_step_date: this.value})"></td>
+      <td onclick="event.stopPropagation()"><input class="cell" value="${esc(p.notes)}" placeholder="Notes…"
+        onchange="patchProspect(${p.id}, {notes: this.value})"></td>
+      <td class="faint">${p.created_at ? p.created_at.slice(0, 10) : ''}</td>
+      <td onclick="event.stopPropagation()"><button class="xbtn" title="Remove" onclick="removeProspect(${p.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  $('tableWrap').innerHTML = rows.length
+    ? `<table><thead><tr>${thead}</tr></thead><tbody>${body}</tbody></table>`
+    : `<div class="empty">No prospects yet. Add accounts here, or hit “+ Prospect” on any festival.</div>`;
+}
+
+function setPSort(k) {
+  if (psort.key === k) psort.dir *= -1; else psort = { key: k, dir: 1 };
+  render();
+}
+async function patchProspect(id, patch) {
+  const updated = await api(`/api/prospects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  Object.assign(prospects.find(p => p.id === id), updated);
+}
+async function removeProspect(id) {
+  if (!confirm('Remove this prospect?')) return;
+  await api(`/api/prospects/${id}`, { method: 'DELETE' });
+  prospects = prospects.filter(p => p.id !== id); render();
+}
+
+/* ── Drawer (festival + prospect forms) ────── */
+function field(label, id, value, type = 'text', placeholder = '') {
+  return `<div class="field"><label>${label}</label>
+    <input id="${id}" type="${type}" value="${esc(value)}" placeholder="${esc(placeholder)}"></div>`;
+}
+function openDrawer() { $('overlay').classList.add('open'); $('drawer').classList.add('open'); }
+function closeDrawer() { $('overlay').classList.remove('open'); $('drawer').classList.remove('open'); }
+
+function festivalForm(f = {}) {
+  return `
+    ${field('Name', 'ff-name', f.name)}
+    ${field('Website', 'ff-website', f.website, 'url', 'https://…')}
+    <div class="row2">${field('City', 'ff-city', f.city)}${field('State', 'ff-state', f.state, 'text', 'e.g. CA')}</div>
+    <div class="row3">
+      ${field('Dates', 'ff-dates', f.dates, 'text', 'e.g. Mid-April')}
+      ${field('Start month (1–12)', 'ff-month', f.start_month, 'number')}
+      ${field('Days', 'ff-days', f.days, 'number')}
+    </div>
+    <div class="row2">
+      ${field('Ticket price min ($)', 'ff-pmin', f.ticket_price_min, 'number')}
+      ${field('Ticket price max ($)', 'ff-pmax', f.ticket_price_max, 'number')}
+    </div>
+    <div class="row2">
+      ${field('Est. attendance', 'ff-att', f.est_attendance, 'number')}
+      ${field('Revenue override ($)', 'ff-revov', f.revenue_override, 'number')}
+    </div>
+    <div class="hint" style="margin:-8px 0 14px">
+      Est. revenue ${f.est_revenue != null ? 'is currently ' + money(f.est_revenue) + ' (estimated)' : 'will be computed from attendance × ticket prices'}.
+      A revenue override always wins over the estimate.
+    </div>
+    <div class="row2">
+      ${field('Ticketing platform', 'ff-platform', f.ticketing_platform, 'text', 'e.g. AXS, Front Gate')}
+      ${field('On platform since (year)', 'ff-since', f.platform_since_year, 'number')}
+    </div>
+    <div class="field"><label>Contacts</label>
+      <textarea id="ff-contacts" placeholder="Name — title — email — phone (one per line)">${esc(f.contacts)}</textarea></div>
+    <div class="field"><label>Notes</label><textarea id="ff-notes">${esc(f.notes)}</textarea></div>
+    <div class="checkline"><input type="checkbox" id="ff-review" ${f.needs_review ? 'checked' : ''}>
+      <span>Needs review</span></div>
+    <div class="checkline"><input type="checkbox" id="ff-sf" ${f.in_salesforce ? 'checked' : ''}>
+      <span>In Salesforce</span></div>`;
+}
+
+function readFestivalForm() {
+  const num = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+  const str = id => { const v = $(id).value.trim(); return v === '' ? null : v; };
+  return {
+    name: str('ff-name'), website: str('ff-website'), city: str('ff-city'),
+    state: str('ff-state'), dates: str('ff-dates'), start_month: num('ff-month'),
+    days: num('ff-days'), ticket_price_min: num('ff-pmin'), ticket_price_max: num('ff-pmax'),
+    est_attendance: num('ff-att'), revenue_override: num('ff-revov'),
+    ticketing_platform: str('ff-platform'), platform_since_year: num('ff-since'),
+    contacts: str('ff-contacts'), notes: str('ff-notes'),
+    needs_review: $('ff-review').checked, in_salesforce: $('ff-sf').checked,
+  };
+}
+
+function openAdd() { tab === 'festivals' ? openFestivalAdd() : openProspectAdd(); }
+
+function openFestivalAdd() {
+  $('drawerTitle').textContent = 'Add festival';
+  $('drawerBody').innerHTML = festivalForm();
+  $('drawerFoot').innerHTML = `
+    <button class="btn" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveFestival(null)">Add festival</button>`;
+  openDrawer();
+}
+
+function openEdit(id) {
+  const f = festivals.find(x => x.id === id);
+  $('drawerTitle').textContent = f.name;
+  $('drawerBody').innerHTML = festivalForm(f);
+  $('drawerFoot').innerHTML = `
+    <button class="btn danger" style="margin-right:auto" onclick="deleteFestival(${id})">Delete</button>
+    <button class="btn" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveFestival(${id})">Save</button>`;
+  openDrawer();
+}
+
+async function saveFestival(id) {
+  const body = readFestivalForm();
+  if (!body.name) { toast('Name is required'); return; }
+  if (id == null) {
+    const f = await api('/api/festivals', { method: 'POST', body: JSON.stringify(body) });
+    festivals.push(f); toast('Festival added');
+  } else {
+    const f = await api(`/api/festivals/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    Object.assign(festivals.find(x => x.id === id), f); toast('Saved');
+  }
+  closeDrawer(); render();
+}
+
+async function deleteFestival(id) {
+  if (!confirm('Delete this festival from the database?')) return;
+  await api(`/api/festivals/${id}`, { method: 'DELETE' });
+  festivals = festivals.filter(f => f.id !== id);
+  closeDrawer(); render(); toast('Deleted');
+}
+
+function prospectForm(p = {}) {
+  return `
+    ${field('Account name', 'pf-name', p.name)}
+    ${field('Website', 'pf-website', p.website, 'url', 'https://…')}
+    <div class="row2">
+      <div class="field"><label>Stage</label><select id="pf-stage">
+        ${STAGES.map(([v, l]) => `<option value="${v}" ${p.stage === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select></div>
+      <div class="field"><label>Priority</label><select id="pf-priority">
+        ${PRIORITIES.map(([v, l]) => `<option value="${v}" ${(p.priority || 'medium') === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row2">
+      ${field('Next step', 'pf-next', p.next_step)}
+      ${field('By (date)', 'pf-date', p.next_step_date, 'date')}
+    </div>
+    <div class="field"><label>Contacts</label>
+      <textarea id="pf-contacts" placeholder="Name — title — email — phone (one per line)">${esc(p.contacts)}</textarea></div>
+    <div class="field"><label>Notes</label><textarea id="pf-notes">${esc(p.notes)}</textarea></div>`;
+}
+
+function readProspectForm() {
+  const str = id => { const v = $(id).value.trim(); return v === '' ? null : v; };
+  return {
+    name: str('pf-name'), website: str('pf-website'),
+    stage: $('pf-stage').value, priority: $('pf-priority').value,
+    next_step: str('pf-next'), next_step_date: str('pf-date'),
+    contacts: str('pf-contacts'), notes: str('pf-notes'),
+  };
+}
+
+function openProspectAdd() {
+  $('drawerTitle').textContent = 'Add prospect';
+  $('drawerBody').innerHTML = prospectForm();
+  $('drawerFoot').innerHTML = `
+    <button class="btn" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveProspect(null)">Add prospect</button>`;
+  openDrawer();
+}
+
+function openProspectEdit(id) {
+  const p = prospects.find(x => x.id === id);
+  $('drawerTitle').textContent = p.name;
+  $('drawerBody').innerHTML = prospectForm(p);
+  $('drawerFoot').innerHTML = `
+    <button class="btn" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveProspect(${id})">Save</button>`;
+  openDrawer();
+}
+
+async function saveProspect(id) {
+  const body = readProspectForm();
+  if (!body.name) { toast('Account name is required'); return; }
+  if (id == null) {
+    const p = await api('/api/prospects', { method: 'POST', body: JSON.stringify(body) });
+    prospects.push(p); toast('Prospect added');
+  } else {
+    const p = await api(`/api/prospects/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    Object.assign(prospects.find(x => x.id === id), p); toast('Saved');
+  }
+  closeDrawer(); render();
+}
+
+/* ── Scrape status bar ─────────────────────── */
+function renderStatusbar() {
+  const last = scrapeLogs[0];
+  let left;
+  if (!last) {
+    left = `<span><span class="dot ok"></span>Daily scrape runs automatically — no runs yet.</span>`;
+  } else {
+    const when = new Date(last.started_at + 'Z').toLocaleString();
+    left = `<span><span class="dot ${last.status}"></span>Last scrape: ${when} — ${esc(last.message || last.status)}</span>`;
+  }
+  $('statusbar').innerHTML = `${left}
+    <button class="btn sm" onclick="runScrape(this)">Run scrape now</button>
+    <span style="margin-left:auto" class="faint">Auto-discovers new U.S. festivals daily · $2M+ est. revenue qualifies</span>`;
+}
+
+async function runScrape(btn) {
+  btn.disabled = true; btn.textContent = 'Scraping…';
+  await api('/api/scrape/run', { method: 'POST' });
+  toast('Scrape started — refreshing in ~45s');
+  setTimeout(async () => { await loadAll(); }, 45000);
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Run scrape now'; }, 45000);
+}
+
+/* ── Render root ───────────────────────────── */
+function render() { tab === 'festivals' ? renderFestivals() : renderProspects(); }
+
+/* ── Boot ──────────────────────────────────── */
+(async function boot() {
+  const auth = await fetch('/api/auth', { credentials: 'same-origin' }).then(r => r.json());
+  if (auth.password_required && !auth.authed) {
+    $('loginScreen').classList.add('open');
+    return;
+  }
+  loadAll();
+})();
+</script>
+</body>
+</html>

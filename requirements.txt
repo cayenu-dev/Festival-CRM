@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+httpx
+beautifulsoup4
+apscheduler
+python-dotenv
+pydantic

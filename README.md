@@ -10,7 +10,8 @@ minimalist frontend.
   tenure, and an inline **In Salesforce?** yes/no dropdown. Filter chips for
   Qualified ($2M+), Needs review, and Salesforce status. Click any row to edit
   everything (including a manual revenue override, which always wins over the
-  estimate). Ships pre-seeded with ~38 major U.S. festivals.
+  estimate). Ships pre-seeded with 100 major U.S. festivals; the seed list tops
+  itself up on deploy (matched by name, never overwriting your edits).
 - **Prospecting tab** — accounts you're actively working. Add manually or hit
   **+ Prospect** on any festival row. Inline-editable stage (Researching →
   Outreach → Meeting → Negotiating → Closed), priority, next step, and notes.

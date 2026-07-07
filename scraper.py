@@ -39,8 +39,8 @@ HEADERS = {
 MFW_URL = "https://www.musicfestivalwizard.com/festival-guide/us-festivals/page/{page}/"
 MFW_MAX_PAGES = 10
 WIKI_LIST_URL = "https://en.wikipedia.org/wiki/List_of_music_festivals_in_the_United_States"
-WIKI_ARTICLE_FETCH_LIMIT = 40   # max festival articles fetched per run
-REVIEW_QUEUE_CAP = 25           # max no-revenue candidates added per run
+WIKI_ARTICLE_FETCH_LIMIT = 60   # max festival articles fetched per run
+REVIEW_QUEUE_CAP = 40           # max no-revenue candidates added per run
 DEFAULT_PASS_PRICE = 200        # conservative avg pass price when unknown
 
 US_STATES = {

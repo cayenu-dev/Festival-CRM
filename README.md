@@ -16,11 +16,14 @@ minimalist frontend.
   **+ Prospect** on any festival row. Inline-editable stage (Researching →
   Outreach → Meeting → Negotiating → Closed), priority, next step, and notes.
 - **Daily scraper** — runs automatically once a day (and on demand via the
-  status bar). Discovers new festivals from Music Festival Wizard's US guide and
-  Wikipedia's list of U.S. music festivals, dedupes against the database,
-  estimates revenue from attendance where available, and:
+  status bar). Discovers new festivals from Music Festival Wizard's US guide,
+  Wikipedia's list of U.S. music festivals, and Tixr's public sitemap (US
+  festival events, auto-tagged `ticketing_platform = Tixr`; existing festivals
+  with no platform get tagged when found there). It dedupes against the
+  database, estimates revenue from attendance where available, and:
   - adds revenue-qualified finds (est. ≥ $2M) to the main list flagged **review**
-  - queues the rest in the **Needs review** filter (capped per run)
+  - queues the rest in the **Needs review** filter (capped per run; Tixr finds
+    are exempt from the cap)
 
 ## Data honesty
 

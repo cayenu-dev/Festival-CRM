@@ -5,17 +5,25 @@ Sources:
   2. Wikipedia's "List of music festivals in the United States" (names), with a
      follow-up fetch of each new festival's article to pull attendance/website
      from the infobox so revenue can be estimated.
+  3. Tixr's public sitemap: event pages whose slug looks festival-like are
+     fetched and their schema.org Event JSON-LD parsed. US events are added
+     with ticketing_platform="Tixr", and existing festivals that lack a
+     platform get tagged "Tixr" when found there.
 
 Rules:
-  - Festivals already in the DB (matched on normalized name) are skipped.
+  - Festivals already in the DB (matched on normalized name) are skipped
+    (Tixr may still enrich their platform field).
   - If attendance is found, revenue is estimated (attendance x avg pass price,
     defaulting to a conservative $200/pass when prices are unknown). Estimates
     >= $2M land in the main list, flagged needs_review until confirmed.
   - Candidates with no revenue signal go to the review queue (needs_review,
     no revenue), capped per run so a first scrape doesn't flood the table.
+    Tixr finds are exempt from the cap — knowing a festival sells on Tixr is
+    the point, so they all land in the review queue.
 """
 
 import asyncio
+import json
 import re
 from datetime import datetime
 
@@ -42,6 +50,14 @@ WIKI_LIST_URL = "https://en.wikipedia.org/wiki/List_of_music_festivals_in_the_Un
 WIKI_ARTICLE_FETCH_LIMIT = 60   # max festival articles fetched per run
 REVIEW_QUEUE_CAP = 40           # max no-revenue candidates added per run
 DEFAULT_PASS_PRICE = 200        # conservative avg pass price when unknown
+
+TIXR_BASE = "https://www.tixr.com"
+TIXR_SITEMAP_LIMIT = 40         # max sitemap files walked per run
+TIXR_EVENT_FETCH_LIMIT = 150    # max event pages fetched per run
+FESTIVAL_SLUG_RE = re.compile(r"fest", re.I)
+
+MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID",
@@ -157,6 +173,129 @@ def _parse_wiki_article(html: str) -> dict:
     return info
 
 
+def _iter_jsonld_events(html: str):
+    """Yield schema.org Event-ish dicts from a page's JSON-LD blocks."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        nodes = data if isinstance(data, list) else data.get("@graph", [data])
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            t = node.get("@type", "")
+            types = t if isinstance(t, list) else [t]
+            if any("Event" in str(x) or "Festival" in str(x) for x in types):
+                yield node
+
+
+def _parse_tixr_event(html: str, url: str) -> dict | None:
+    """Event page -> candidate dict, or None if it isn't a US event."""
+    for ev in _iter_jsonld_events(html):
+        name = (ev.get("name") or "").strip()
+        if not name:
+            continue
+        loc = ev.get("location") or {}
+        if isinstance(loc, list):
+            loc = loc[0] if loc else {}
+        addr = loc.get("address") or {} if isinstance(loc, dict) else {}
+        if isinstance(addr, str):
+            addr = {"streetAddress": addr}
+        country = str(addr.get("addressCountry") or "").upper()
+        state = str(addr.get("addressRegion") or "").strip()
+        city = str(addr.get("addressLocality") or "").strip() or None
+        is_us = (country in ("US", "USA", "UNITED STATES")
+                 or (not country and state.upper() in US_STATES))
+        if not is_us:
+            continue
+        dates = None
+        start_month = None
+        start = str(ev.get("startDate") or "")
+        end = str(ev.get("endDate") or "")
+        m = re.match(r"(\d{4})-(\d{2})-(\d{2})", start)
+        if m:
+            year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            start_month = month
+            dates = f"{MONTHS[month]} {day}"
+            m2 = re.match(r"(\d{4})-(\d{2})-(\d{2})", end)
+            if m2 and m2.group(0) != m.group(0):
+                em, ed = int(m2.group(2)), int(m2.group(3))
+                dates += f"–{ed}" if em == month else f" – {MONTHS[em]} {ed}"
+            dates += f", {year}"
+        return {
+            "name": name,
+            "city": city,
+            "state": state.upper() if state.upper() in US_STATES else (state or None),
+            "dates": dates,
+            "start_month": start_month,
+            "website": url,
+            "origin": "tixr",
+            "source_url": url,
+            "platform": "Tixr",
+        }
+    return None
+
+
+async def _tixr_event_urls(client: httpx.AsyncClient) -> list[str]:
+    """Walk Tixr's sitemap(s) and return event URLs with festival-like slugs."""
+    robots = await _get(client, f"{TIXR_BASE}/robots.txt")
+    queue = re.findall(r"(?im)^sitemap:\s*(\S+)", robots or "")
+    if not queue:
+        queue = [f"{TIXR_BASE}/sitemap.xml"]
+    seen_maps, urls = set(), set()
+    while queue and len(seen_maps) < TIXR_SITEMAP_LIMIT:
+        sm = queue.pop(0)
+        if sm in seen_maps:
+            continue
+        seen_maps.add(sm)
+        xml = await _get(client, sm)
+        if not xml:
+            continue
+        for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml):
+            last = loc.rstrip("/").rsplit("/", 1)[-1]
+            if last.endswith(".xml") or "sitemap" in last.lower():
+                queue.append(loc)
+            elif "/events/" in loc or "/e/" in loc:
+                urls.add(loc)
+        await asyncio.sleep(0.3)
+    return sorted(u for u in urls if FESTIVAL_SLUG_RE.search(u.rsplit("/", 1)[-1]))
+
+
+async def _collect_tixr(client: httpx.AsyncClient, db, existing: set) -> tuple[list, int, int]:
+    """Fetch festival-looking Tixr events.
+
+    Returns (new_candidates, pages_scanned, existing_rows_tagged). Existing
+    festivals with an empty ticketing_platform found on Tixr are tagged in
+    place as an enrichment.
+    """
+    candidates, scanned, enriched = [], 0, 0
+    seen_keys = set()
+    for url in (await _tixr_event_urls(client))[:TIXR_EVENT_FETCH_LIMIT]:
+        html = await _get(client, url)
+        scanned += 1
+        if html:
+            c = _parse_tixr_event(html, url)
+            if c:
+                key = normalize_name(c["name"])
+                if not key or key in seen_keys:
+                    pass
+                elif key in existing:
+                    row = (db.query(Festival)
+                           .filter(Festival.name_key == key).first())
+                    if row and not row.ticketing_platform:
+                        row.ticketing_platform = "Tixr"
+                        row.notes = ((row.notes + "; ") if row.notes else "") + \
+                            f"Found selling on Tixr ({url})"
+                        enriched += 1
+                else:
+                    seen_keys.add(key)
+                    candidates.append(c)
+        await asyncio.sleep(0.4)  # be polite
+    return candidates, scanned, enriched
+
+
 def _estimate_revenue(attendance, price_min, price_max):
     if not attendance:
         return None
@@ -217,6 +356,23 @@ async def run_scrape() -> ScrapeLog:
                 }
                 await asyncio.sleep(0.5)
 
+            # -- Tixr sitemap crawl ----------------------------------------
+            tixr_scanned = tixr_enriched = 0
+            try:
+                tixr_new, tixr_scanned, tixr_enriched = await _collect_tixr(
+                    client, db, existing)
+                for c in tixr_new:
+                    key = normalize_name(c["name"])
+                    if key and key not in candidates:
+                        candidates[key] = c
+                if tixr_enriched:
+                    db.commit()
+            except Exception as e:
+                tixr_note = f"Tixr source failed: {type(e).__name__}: {e}"
+            else:
+                tixr_note = (f"Tixr: {tixr_scanned} event pages scanned, "
+                             f"{tixr_enriched} existing festivals tagged")
+
         # -- Insert --------------------------------------------------------
         added = review_added = 0
         for key, c in candidates.items():
@@ -224,8 +380,10 @@ async def run_scrape() -> ScrapeLog:
             est = _estimate_revenue(attendance, None, None)
             qualified = est is not None and est >= QUALIFYING_REVENUE
             if not qualified:
-                if review_added >= REVIEW_QUEUE_CAP:
-                    continue
+                # Tixr finds are exempt from the cap: platform intel is the point
+                if c.get("origin") != "tixr":
+                    if review_added >= REVIEW_QUEUE_CAP:
+                        continue
                 review_added += 1
             note_bits = [f"Auto-scraped from {c.get('origin')} ({c.get('source_url', '')})"]
             if qualified:
@@ -238,8 +396,10 @@ async def run_scrape() -> ScrapeLog:
                 city=c.get("city"),
                 state=c.get("state"),
                 dates=c.get("dates"),
+                start_month=c.get("start_month"),
                 est_attendance=attendance,
                 est_revenue=est,
+                ticketing_platform=c.get("platform"),
                 source="scraped",
                 needs_review=True,
                 notes="; ".join(note_bits),
@@ -251,7 +411,8 @@ async def run_scrape() -> ScrapeLog:
         log.found = len(candidates)
         log.added = added
         log.message = (f"{len(candidates)} new candidates; {added} added "
-                       f"({added - review_added} revenue-qualified, {review_added} to review queue)")
+                       f"({added - review_added} revenue-qualified, "
+                       f"{review_added} to review queue); {tixr_note}")
     except Exception as e:  # keep the log row honest rather than crashing the app
         db.rollback()
         log.status = "error"

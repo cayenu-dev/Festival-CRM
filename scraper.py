@@ -191,6 +191,31 @@ def _iter_jsonld_events(html: str):
                 yield node
 
 
+def _parse_offers(ev: dict) -> tuple[float | None, float | None]:
+    """Pull (min, max) USD ticket prices from a JSON-LD event's offers."""
+    offers = ev.get("offers") or []
+    if isinstance(offers, dict):
+        offers = [offers]
+    prices = []
+    for o in offers:
+        if not isinstance(o, dict):
+            continue
+        currency = str(o.get("priceCurrency") or "USD").upper()
+        if currency not in ("USD", ""):
+            continue
+        for k in ("price", "lowPrice", "highPrice"):
+            try:
+                p = float(str(o.get(k)).replace("$", "").replace(",", ""))
+            except (TypeError, ValueError):
+                continue
+            if p > 0:
+                prices.append(p)
+    if not prices:
+        return None, None
+    lo, hi = min(prices), max(prices)
+    return lo, (hi if hi > lo else None)
+
+
 def _parse_tixr_event(html: str, url: str) -> dict | None:
     """Event page -> candidate dict, or None if it isn't a US event."""
     for ev in _iter_jsonld_events(html):
@@ -224,12 +249,15 @@ def _parse_tixr_event(html: str, url: str) -> dict | None:
                 em, ed = int(m2.group(2)), int(m2.group(3))
                 dates += f"–{ed}" if em == month else f" – {MONTHS[em]} {ed}"
             dates += f", {year}"
+        price_min, price_max = _parse_offers(ev)
         return {
             "name": name,
             "city": city,
             "state": state.upper() if state.upper() in US_STATES else (state or None),
             "dates": dates,
             "start_month": start_month,
+            "price_min": price_min,
+            "price_max": price_max,
             "website": url,
             "origin": "tixr",
             "source_url": url,
@@ -284,10 +312,19 @@ async def _collect_tixr(client: httpx.AsyncClient, db, existing: set) -> tuple[l
                 elif key in existing:
                     row = (db.query(Festival)
                            .filter(Festival.name_key == key).first())
+                    changed = False
                     if row and not row.ticketing_platform:
                         row.ticketing_platform = "Tixr"
                         row.notes = ((row.notes + "; ") if row.notes else "") + \
                             f"Found selling on Tixr ({url})"
+                        changed = True
+                    if (row and row.ticket_price_min is None
+                            and row.ticket_price_max is None
+                            and c.get("price_min") is not None):
+                        row.ticket_price_min = c["price_min"]
+                        row.ticket_price_max = c["price_max"]
+                        changed = True
+                    if changed:
                         enriched += 1
                 else:
                     seen_keys.add(key)
@@ -397,6 +434,8 @@ async def run_scrape() -> ScrapeLog:
                 state=c.get("state"),
                 dates=c.get("dates"),
                 start_month=c.get("start_month"),
+                ticket_price_min=c.get("price_min"),
+                ticket_price_max=c.get("price_max"),
                 est_attendance=attendance,
                 est_revenue=est,
                 ticketing_platform=c.get("platform"),

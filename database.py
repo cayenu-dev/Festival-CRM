@@ -85,6 +85,13 @@ class Prospect(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class AppMeta(Base):
+    """Marker rows for one-time data migrations."""
+    __tablename__ = "app_meta"
+    key = Column(String, primary_key=True)
+    value = Column(Text)
+
+
 class ScrapeLog(Base):
     __tablename__ = "scrape_logs"
     id = Column(Integer, primary_key=True, index=True)
@@ -106,3 +113,22 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+
+def apply_cleanups(db) -> int:
+    """One-time removal of festivals on major (Live Nation/AEG) ticketing
+    platforms — AXS, Ticketmaster, Front Gate Tickets — which aren't sales
+    prospects. Runs once per database (tracked in app_meta), so festivals a
+    user later tags with these platforms are left alone."""
+    marker = "remove_axs_ticketmaster_frontgate_v1"
+    if db.get(AppMeta, marker):
+        return 0
+    removed = 0
+    for f in db.query(Festival).all():
+        pl = re.sub(r"[^a-z]", "", (f.ticketing_platform or "").lower())
+        if pl == "axs" or "ticketmaster" in pl or "frontgate" in pl:
+            db.delete(f)
+            removed += 1
+    db.add(AppMeta(key=marker, value=f"removed {removed}"))
+    db.commit()
+    return removed

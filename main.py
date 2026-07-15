@@ -14,7 +14,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database import Festival, Prospect, ScrapeLog, get_db, init_db, normalize_name
+from database import (Festival, Prospect, ScrapeLog, apply_cleanups, get_db,
+                      init_db, normalize_name)
 from scraper import run_scrape
 from seed_data import seed_festivals
 
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
     init_db()
     db = next(get_db())
     seed_festivals(db)
+    apply_cleanups(db)
     db.close()
     scheduler.add_job(run_scrape, CronTrigger(hour=SCRAPE_HOUR_UTC, minute=0),
                       id="daily_scrape", replace_existing=True)

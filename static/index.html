@@ -228,6 +228,7 @@
   </nav>
   <div class="header-right">
     <input class="search" id="search" placeholder="Search…" oninput="render()">
+    <button class="btn" id="exportBtn" onclick="exportCsv()">Export CSV</button>
     <button class="btn primary" id="addBtn" onclick="openAdd()">+ Add festival</button>
   </div>
 </header>
@@ -345,9 +346,91 @@ function renderChips(visibleCount, totalLabel) {
     bar.innerHTML = `<span class="count">${totalLabel}</span>`;
     return;
   }
-  bar.innerHTML = CHIPS.map(([k, label]) =>
+  const chips = CHIPS.map(([k, label]) =>
     `<button class="chip ${filter === k ? 'active' : ''}" onclick="filter='${k}';render()">${label}</button>`
-  ).join('') + `<span class="count">${totalLabel}</span>`;
+  ).join('');
+  const detect = filter === 'review'
+    ? `<button class="chip" id="detectBtn" onclick="detectPlatforms()"
+         style="border-color:var(--accent);color:var(--accent)">⌕ Detect ticketing platforms</button>`
+    : '';
+  bar.innerHTML = chips + detect + `<span class="count">${totalLabel}</span>`;
+}
+
+/* ── Platform detection (review queue) ─────── */
+let detectPolling = null;
+async function detectPlatforms() {
+  const btn = $('detectBtn');
+  const r = await api('/api/festivals/detect-platforms', {
+    method: 'POST', body: JSON.stringify({}) });
+  if (r.status === 'already_running') { toast('Detection already running…'); }
+  else { toast('Scanning festival websites — this runs in the background'); }
+  if (btn) { btn.disabled = true; btn.textContent = '⌕ Detecting…'; }
+  if (detectPolling) clearInterval(detectPolling);
+  detectPolling = setInterval(pollDetect, 4000);
+  pollDetect();
+}
+async function pollDetect() {
+  const s = await api('/api/festivals/detect-platforms/status');
+  const btn = $('detectBtn');
+  if (s.running) {
+    if (btn) btn.textContent = `⌕ ${s.message || 'Detecting…'}`;
+    return;
+  }
+  clearInterval(detectPolling); detectPolling = null;
+  if (s.message) toast(s.message);
+  if (s.found) { await loadAll(); }
+  else if (btn) { btn.disabled = false; btn.textContent = '⌕ Detect ticketing platforms'; }
+}
+
+/* ── CSV export ────────────────────────────── */
+function csvCell(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadCsv(filename, headers, rows) {
+  const lines = [headers.map(csvCell).join(',')];
+  for (const r of rows) lines.push(r.map(csvCell).join(','));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function exportCsv() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (tab === 'festivals') {
+    const rows = filteredFestivals();
+    const headers = ['Festival', 'Website', 'City', 'State', 'Dates',
+      'Ticket Price Min', 'Ticket Price Max', 'Est. Revenue', 'Revenue Basis',
+      'Est. Attendance', 'Ticketing Platform', 'On Platform Since',
+      'Contacts', 'In Salesforce?', 'Needs Review', 'Source', 'Notes'];
+    const data = rows.map(f => [
+      f.name, f.website, f.city, f.state, f.dates,
+      f.ticket_price_min, f.ticket_price_max, f.effective_revenue,
+      f.effective_revenue == null ? '' : (f.revenue_override != null ? 'manual' : 'estimated'),
+      f.est_attendance, f.ticketing_platform, f.platform_since_year,
+      f.contacts, f.in_salesforce ? 'Yes' : 'No', f.needs_review ? 'Yes' : 'No',
+      f.source, f.notes,
+    ]);
+    downloadCsv(`festivals-${filter}-${today}.csv`, headers, data);
+    toast(`Exported ${data.length} festivals`);
+  } else {
+    const q = $('search').value.trim().toLowerCase();
+    const rows = prospects.filter(p => !q ||
+      [p.name, p.stage, p.next_step, p.notes, p.contacts].join(' ').toLowerCase().includes(q));
+    const stageLabel = Object.fromEntries(STAGES);
+    const headers = ['Account', 'Website', 'Stage', 'Priority', 'Next Step',
+      'By', 'Contacts', 'Notes', 'Added'];
+    const data = rows.map(p => [
+      p.name, p.website, stageLabel[p.stage] || p.stage, p.priority,
+      p.next_step, p.next_step_date, p.contacts, p.notes,
+      p.created_at ? p.created_at.slice(0, 10) : '',
+    ]);
+    downloadCsv(`prospects-${today}.csv`, headers, data);
+    toast(`Exported ${data.length} prospects`);
+  }
 }
 
 /* ── Festivals table ───────────────────────── */

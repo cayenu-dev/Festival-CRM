@@ -19,6 +19,15 @@ minimalist frontend.
 - **Prospecting tab** — accounts you're actively working. Add manually or hit
   **+ Prospect** on any festival row. Inline-editable stage (Researching →
   Outreach → Meeting → Negotiating → Closed), priority, next step, and notes.
+- **Detect ticketing platforms** — in the **Needs review** filter, a button
+  scans each festival's own website (and its tickets/buy pages) for the
+  fingerprints of ticketing providers (Tixr, See Tickets, DICE, Eventbrite,
+  Etix, ShowClix, and more) and fills in the platform column. Conservative:
+  it only writes a platform on a real match, leaving unknowns blank.
+- **Export CSV** — the header button exports the current tab to CSV. On the
+  Festivals tab it respects the active filter and search (e.g. export just the
+  "Needs review" set, or everything "In Salesforce"); on Prospecting it exports
+  your pipeline. Opens straight in Excel/Google Sheets.
 - **Daily scraper** — runs automatically once a day (and on demand via the
   status bar). Discovers new festivals from Music Festival Wizard's US guide,
   Wikipedia's list of U.S. music festivals, and Tixr's public sitemap (US

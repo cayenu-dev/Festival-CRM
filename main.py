@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from database import (Festival, Prospect, ScrapeLog, apply_cleanups, get_db,
                       init_db, normalize_name)
+from platforms import detect_for_festivals
 from scraper import run_scrape
 from seed_data import seed_festivals
 
@@ -277,6 +278,54 @@ async def trigger_scrape():
         return {"status": "already_running"}
     _scrape_task = asyncio.create_task(run_scrape())
     return {"status": "started"}
+
+
+_detect_task: Optional[asyncio.Task] = None
+_detect_state = {"running": False, "checked": 0, "found": 0, "message": ""}
+
+
+async def _run_detect(only_missing: bool):
+    """Detect ticketing platforms for review-queue festivals, persist results."""
+    db = next(get_db())
+    try:
+        q = db.query(Festival).filter(Festival.needs_review == True)  # noqa: E712
+        if only_missing:
+            q = q.filter((Festival.ticketing_platform == None)         # noqa: E711
+                         | (Festival.ticketing_platform == ""))
+        targets = [f for f in q.all() if f.website]
+        _detect_state.update(running=True, checked=0, found=0,
+                             message=f"Checking {len(targets)} festivals…")
+        results = await detect_for_festivals(targets)
+        for fid, platform in results.items():
+            f = db.get(Festival, fid)
+            if f and (not only_missing or not f.ticketing_platform):
+                f.ticketing_platform = platform
+                note = f"Platform detected from website: {platform}"
+                f.notes = ((f.notes + "; ") if f.notes else "") + note
+        db.commit()
+        _detect_state.update(
+            running=False, checked=len(targets), found=len(results),
+            message=f"Detected platform for {len(results)} of {len(targets)} festivals.")
+    except Exception as e:
+        db.rollback()
+        _detect_state.update(running=False,
+                             message=f"Detection failed: {type(e).__name__}: {e}")
+    finally:
+        db.close()
+
+
+@app.post("/api/festivals/detect-platforms")
+async def detect_platforms(only_missing: bool = True):
+    global _detect_task
+    if _detect_task and not _detect_task.done():
+        return {"status": "already_running"}
+    _detect_task = asyncio.create_task(_run_detect(only_missing))
+    return {"status": "started"}
+
+
+@app.get("/api/festivals/detect-platforms/status")
+def detect_platforms_status():
+    return _detect_state
 
 
 @app.get("/api/scrape/logs")

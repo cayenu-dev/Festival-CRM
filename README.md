@@ -19,11 +19,16 @@ minimalist frontend.
 - **Prospecting tab** — accounts you're actively working. Add manually or hit
   **+ Prospect** on any festival row. Inline-editable stage (Researching →
   Outreach → Meeting → Negotiating → Closed), priority, next step, and notes.
-- **Detect ticketing platforms** — in the **Needs review** filter, a button
-  scans each festival's own website (and its tickets/buy pages) for the
-  fingerprints of ticketing providers (Tixr, See Tickets, DICE, Eventbrite,
-  Etix, ShowClix, and more) and fills in the platform column. Conservative:
-  it only writes a platform on a real match, leaving unknowns blank.
+- **Fill platform, prices & revenue** — a button on the Festivals tab scans
+  each festival's own website (and its tickets/buy pages) and fills in what it
+  finds: the **ticketing platform** (from the fingerprints of Tixr, See
+  Tickets, DICE, Eventbrite, Etix, ShowClix, and more), **ticket prices** (from
+  schema.org offer data or visible prices), and, when the site states an
+  attendance/capacity figure, an **estimated revenue** (avg price × attendance).
+  By default it targets every festival missing a platform or prices; in the
+  **Needs review** filter it targets just that queue. Conservative: it only
+  writes a value on a real match and never overwrites your edits, so unknowns
+  stay blank for you to fill by hand.
 - **Export CSV** — the header button exports the current tab to CSV. On the
   Festivals tab it respects the active filter and search (e.g. export just the
   "Needs review" set, or everything "In Salesforce"); on Prospecting it exports

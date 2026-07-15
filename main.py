@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from database import (Festival, Prospect, ScrapeLog, apply_cleanups, get_db,
                       init_db, normalize_name)
-from platforms import detect_for_festivals
+from platforms import enrich_for_festivals
 from scraper import run_scrape
 from seed_data import seed_festivals
 
@@ -284,28 +284,67 @@ _detect_task: Optional[asyncio.Task] = None
 _detect_state = {"running": False, "checked": 0, "found": 0, "message": ""}
 
 
-async def _run_detect(only_missing: bool):
-    """Detect ticketing platforms for review-queue festivals, persist results."""
+def _avg_pass_price(pmin, pmax):
+    if pmin and pmax:
+        return 0.8 * pmin + 0.2 * pmax   # GA-weighted GA/VIP blend
+    return pmin or pmax
+
+
+async def _run_detect(scope: str):
+    """Enrich festivals from their websites: platform, ticket prices, and
+    (where attendance is stated) estimated revenue. `scope` is 'missing'
+    (any festival lacking platform or prices) or 'review' (review queue only)."""
     db = next(get_db())
     try:
-        q = db.query(Festival).filter(Festival.needs_review == True)  # noqa: E712
-        if only_missing:
-            q = q.filter((Festival.ticketing_platform == None)         # noqa: E711
-                         | (Festival.ticketing_platform == ""))
+        q = db.query(Festival)
+        if scope == "review":
+            q = q.filter(Festival.needs_review == True)  # noqa: E712
+        else:  # 'missing': anything without a platform or without prices
+            q = q.filter(
+                (Festival.ticketing_platform == None)     # noqa: E711
+                | (Festival.ticketing_platform == "")
+                | ((Festival.ticket_price_min == None)     # noqa: E711
+                   & (Festival.ticket_price_max == None)))
         targets = [f for f in q.all() if f.website]
         _detect_state.update(running=True, checked=0, found=0,
-                             message=f"Checking {len(targets)} festivals…")
-        results = await detect_for_festivals(targets)
-        for fid, platform in results.items():
+                             message=f"Scanning {len(targets)} festival websites…")
+        results = await enrich_for_festivals(targets)
+
+        enriched = 0
+        for fid, data in results.items():
             f = db.get(Festival, fid)
-            if f and (not only_missing or not f.ticketing_platform):
-                f.ticketing_platform = platform
-                note = f"Platform detected from website: {platform}"
-                f.notes = ((f.notes + "; ") if f.notes else "") + note
+            if not f:
+                continue
+            notes = []
+            if data["platform"] and not f.ticketing_platform:
+                f.ticketing_platform = data["platform"]
+                notes.append(f"platform {data['platform']}")
+            if (data["price_min"] is not None
+                    and f.ticket_price_min is None and f.ticket_price_max is None):
+                f.ticket_price_min = data["price_min"]
+                f.ticket_price_max = data["price_max"]
+                rng = (f"${int(data['price_min'])}–${int(data['price_max'])}"
+                       if data["price_max"] else f"${int(data['price_min'])}")
+                notes.append(f"prices {rng}")
+            if data["attendance"] and not f.est_attendance:
+                f.est_attendance = data["attendance"]
+                notes.append(f"attendance ~{data['attendance']:,}")
+            # Estimated revenue: only when we now have attendance AND a price,
+            # and the user hasn't set an override or a prior estimate.
+            price = _avg_pass_price(f.ticket_price_min, f.ticket_price_max)
+            if (f.est_attendance and price and f.revenue_override is None
+                    and f.est_revenue is None):
+                f.est_revenue = round(f.est_attendance * price)
+                notes.append(f"est. revenue ${f.est_revenue:,}")
+            if notes:
+                enriched += 1
+                f.notes = ((f.notes + "; ") if f.notes else "") + \
+                    "From website: " + ", ".join(notes)
         db.commit()
         _detect_state.update(
-            running=False, checked=len(targets), found=len(results),
-            message=f"Detected platform for {len(results)} of {len(targets)} festivals.")
+            running=False, checked=len(targets), found=enriched,
+            message=f"Filled data for {enriched} of {len(targets)} festivals "
+                    f"(platform, prices, and revenue where available).")
     except Exception as e:
         db.rollback()
         _detect_state.update(running=False,
@@ -315,11 +354,11 @@ async def _run_detect(only_missing: bool):
 
 
 @app.post("/api/festivals/detect-platforms")
-async def detect_platforms(only_missing: bool = True):
+async def detect_platforms(scope: str = "missing"):
     global _detect_task
     if _detect_task and not _detect_task.done():
         return {"status": "already_running"}
-    _detect_task = asyncio.create_task(_run_detect(only_missing))
+    _detect_task = asyncio.create_task(_run_detect(scope))
     return {"status": "started"}
 
 

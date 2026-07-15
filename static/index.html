@@ -349,10 +349,11 @@ function renderChips(visibleCount, totalLabel) {
   const chips = CHIPS.map(([k, label]) =>
     `<button class="chip ${filter === k ? 'active' : ''}" onclick="filter='${k}';render()">${label}</button>`
   ).join('');
-  const detect = filter === 'review'
-    ? `<button class="chip" id="detectBtn" onclick="detectPlatforms()"
-         style="border-color:var(--accent);color:var(--accent)">⌕ Detect ticketing platforms</button>`
-    : '';
+  const detectLabel = filter === 'review'
+    ? '⌕ Fill platform, prices & revenue (review queue)'
+    : '⌕ Fill missing platform, prices & revenue';
+  const detect = `<button class="chip" id="detectBtn" onclick="detectPlatforms()"
+       style="border-color:var(--accent);color:var(--accent)">${detectLabel}</button>`;
   bar.innerHTML = chips + detect + `<span class="count">${totalLabel}</span>`;
 }
 
@@ -360,11 +361,12 @@ function renderChips(visibleCount, totalLabel) {
 let detectPolling = null;
 async function detectPlatforms() {
   const btn = $('detectBtn');
-  const r = await api('/api/festivals/detect-platforms', {
+  const scope = filter === 'review' ? 'review' : 'missing';
+  const r = await api(`/api/festivals/detect-platforms?scope=${scope}`, {
     method: 'POST', body: JSON.stringify({}) });
   if (r.status === 'already_running') { toast('Detection already running…'); }
   else { toast('Scanning festival websites — this runs in the background'); }
-  if (btn) { btn.disabled = true; btn.textContent = '⌕ Detecting…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⌕ Scanning…'; }
   if (detectPolling) clearInterval(detectPolling);
   detectPolling = setInterval(pollDetect, 4000);
   pollDetect();
@@ -379,7 +381,7 @@ async function pollDetect() {
   clearInterval(detectPolling); detectPolling = null;
   if (s.message) toast(s.message);
   if (s.found) { await loadAll(); }
-  else if (btn) { btn.disabled = false; btn.textContent = '⌕ Detect ticketing platforms'; }
+  else if (btn) { btn.disabled = false; render(); }
 }
 
 /* ── CSV export ────────────────────────────── */

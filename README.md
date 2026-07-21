@@ -64,7 +64,28 @@ for review.
 4. Generate a domain under Settings → Networking. That URL works from any
    machine, including your work laptop — just enter the password.
 
-## Run locally
+## Run on your own machine (no hosting needed)
+
+You don't need Railway or any paid service — the CRM runs fine on your own
+computer, and your data is saved in `festival_crm.db` right in this folder.
+
+1. **Install Python 3** if you don't have it: https://www.python.org/downloads/
+   (on Windows, tick "Add Python to PATH" during install).
+2. **Download this project** — on GitHub, the green **Code** button →
+   **Download ZIP**, then unzip it. (Or `git clone` if you use git.)
+3. **Start it:**
+   - **Mac:** double-click `run_local.sh` (or run `bash run_local.sh` in Terminal).
+   - **Windows:** double-click `run_local.bat`.
+   The first launch takes about a minute to set itself up; after that it's a
+   few seconds.
+4. Your browser opens to **http://localhost:8000**. Leave the little terminal
+   window open while you use it; close it (or Ctrl+C) to stop.
+
+Note: `localhost` only works on the computer that's running it. To reach the
+CRM from a *different* machine (e.g. your work laptop), you need to host it —
+see below.
+
+### Manual start (advanced)
 
 ```bash
 pip install -r requirements.txt

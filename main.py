@@ -200,6 +200,7 @@ class ProspectBody(BaseModel):
     website: Optional[str] = None
     stage: Optional[str] = None
     priority: Optional[str] = None
+    ticketing_platform: Optional[str] = None
     next_step: Optional[str] = None
     next_step_date: Optional[str] = None
     contacts: Optional[str] = None
@@ -210,6 +211,7 @@ def _prospect_dict(p: Prospect) -> dict:
     return {
         "id": p.id, "festival_id": p.festival_id, "name": p.name,
         "website": p.website, "stage": p.stage, "priority": p.priority,
+        "ticketing_platform": p.ticketing_platform,
         "next_step": p.next_step, "next_step_date": p.next_step_date,
         "contacts": p.contacts, "notes": p.notes,
         "created_at": p.created_at.isoformat() if p.created_at else None,
@@ -235,6 +237,7 @@ def create_prospect(body: ProspectBody, db: Session = Depends(get_db)):
         data.setdefault("name", f.name)
         data.setdefault("website", f.website)
         data.setdefault("contacts", f.contacts)
+        data.setdefault("ticketing_platform", f.ticketing_platform)
     if not data.get("name"):
         raise HTTPException(422, "Name is required")
     p = Prospect(**data)

@@ -77,6 +77,7 @@ class Prospect(Base):
     stage = Column(String, default="researching")
     # researching | outreach | meeting | negotiating | closed_won | closed_lost
     priority = Column(String, default="medium")  # high | medium | low
+    ticketing_platform = Column(String)  # copied from the festival, editable
     next_step = Column(String)
     next_step_date = Column(String)
     contacts = Column(Text)
@@ -113,6 +114,28 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate_columns()
+
+
+def _migrate_columns():
+    """Add columns introduced after a database was first created. SQLAlchemy's
+    create_all only makes missing tables, not missing columns, so new fields on
+    existing tables (e.g. a redeploy onto an existing volume) need a light
+    ALTER. Safe to run every boot — each add is guarded by a column check."""
+    from sqlalchemy import inspect, text
+    wanted = {
+        "prospects": [("ticketing_platform", "VARCHAR")],
+    }
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table, cols in wanted.items():
+            if not inspector.has_table(table):
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, coltype in cols:
+                if name not in existing:
+                    conn.execute(text(
+                        f"ALTER TABLE {table} ADD COLUMN {name} {coltype}"))
 
 
 def apply_cleanups(db) -> int:

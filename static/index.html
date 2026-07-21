@@ -423,11 +423,11 @@ function exportCsv() {
     const rows = prospects.filter(p => !q ||
       [p.name, p.stage, p.next_step, p.notes, p.contacts].join(' ').toLowerCase().includes(q));
     const stageLabel = Object.fromEntries(STAGES);
-    const headers = ['Account', 'Website', 'Stage', 'Priority', 'Next Step',
-      'By', 'Contacts', 'Notes', 'Added'];
+    const headers = ['Account', 'Website', 'Stage', 'Priority', 'Ticketing Platform',
+      'Next Step', 'By', 'Contacts', 'Notes', 'Added'];
     const data = rows.map(p => [
       p.name, p.website, stageLabel[p.stage] || p.stage, p.priority,
-      p.next_step, p.next_step_date, p.contacts, p.notes,
+      p.ticketing_platform, p.next_step, p.next_step_date, p.contacts, p.notes,
       p.created_at ? p.created_at.slice(0, 10) : '',
     ]);
     downloadCsv(`prospects-${today}.csv`, headers, data);
@@ -556,6 +556,7 @@ async function addProspectFromFestival(fid, btn) {
 /* ── Prospects table ───────────────────────── */
 const PCOLS = [
   ['name', 'Account'], ['stage', 'Stage'], ['priority', 'Priority'],
+  ['ticketing_platform', 'Ticketing Platform'],
   ['next_step', 'Next Step'], ['next_step_date', 'By'], ['notes', 'Notes'],
   ['created_at', 'Added'], ['_x', ''],
 ];
@@ -590,6 +591,8 @@ function renderProspects() {
         ${p.website ? `<a class="link" href="${esc(p.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(domain(p.website))}</a>` : ''}</td>
       <td onclick="event.stopPropagation()">${stageSel}</td>
       <td onclick="event.stopPropagation()">${priSel}</td>
+      <td onclick="event.stopPropagation()"><input class="cell" value="${esc(p.ticketing_platform)}" placeholder="—"
+        onchange="patchProspect(${p.id}, {ticketing_platform: this.value})"></td>
       <td onclick="event.stopPropagation()"><input class="cell" value="${esc(p.next_step)}" placeholder="Add next step…"
         onchange="patchProspect(${p.id}, {next_step: this.value})"></td>
       <td onclick="event.stopPropagation()"><input class="cell" type="date" style="min-width:130px" value="${esc(p.next_step_date)}"
@@ -731,6 +734,7 @@ function prospectForm(p = {}) {
         ${PRIORITIES.map(([v, l]) => `<option value="${v}" ${(p.priority || 'medium') === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select></div>
     </div>
+    ${field('Ticketing platform', 'pf-platform', p.ticketing_platform, 'text', 'e.g. Tixr, See Tickets')}
     <div class="row2">
       ${field('Next step', 'pf-next', p.next_step)}
       ${field('By (date)', 'pf-date', p.next_step_date, 'date')}
@@ -745,6 +749,7 @@ function readProspectForm() {
   return {
     name: str('pf-name'), website: str('pf-website'),
     stage: $('pf-stage').value, priority: $('pf-priority').value,
+    ticketing_platform: str('pf-platform'),
     next_step: str('pf-next'), next_step_date: str('pf-date'),
     contacts: str('pf-contacts'), notes: str('pf-notes'),
   };
